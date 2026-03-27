@@ -7,21 +7,15 @@ from exporter import export_maze
 # CONFIG & ASSETS
 # ==============================
 
-CAT = "🚶🏻‍➡️"
-GOAL = "🧕🏻"
-PATH_CHAR = "🔵" # Changed to a blue circle so it pops against the white!
-WALL = "⬛"
+# Converted from sets {...} to lists [...] so we can index them!
+ENTRY_ICONS = ["🚶🏻‍♂️", "🛫", "🤰🏼"]
+TARGET_ICONS = ["🏪", "🗼", "🏥"]
+PATH_ICONS = ["🚶🏻‍♂️", "✈️", "🚑"]
+WALL_ICONS = ["⬛", "🟩", "🟥"]
 OPEN = "⬜"
 
-# ANSI Color Codes for the path (since emojis ignore terminal text colors)
-COLORS = [
-    ("\033[94m", "Blue"),
-    ("\033[92m", "Green"),
-    ("\033[91m", "Red"),
-    ("\033[95m", "Magenta"),
-    ("\033[93m", "Yellow")
-]
-RESET = "\033[0m"
+# The names of your themes to show in the menu
+THEME_NAMES = ["City Walk (Black)", "Flight Path (Green)", "Emergency (Red)"]
 
 # ==============================
 # CORE DISPLAY
@@ -30,23 +24,32 @@ RESET = "\033[0m"
 def clear_screen() -> None:
     os.system("cls" if os.name == "nt" else "clear")
 
-def display_maze(maze, path=None, player_pos=None, path_color="\033[94m") -> None:
+def display_maze(maze, path=None, player_pos=None, theme_index=0) -> None:
     clear_screen()
 
-    # To use solid blocks, we double the resolution of the grid
-    # True = Wall, False = Open Space
+    # Grab the current icons for the selected theme
+    current_entry = ENTRY_ICONS[theme_index]
+    current_target = TARGET_ICONS[theme_index]
+    current_path = PATH_ICONS[theme_index]
+    current_wall = WALL_ICONS[theme_index]
+
     render_w = maze.width * 2 + 1
     render_h = maze.height * 2 + 1
     grid = [[True for _ in range(render_w)] for _ in range(render_h)]
 
-    # 1. Carve out the cells and open walls
+# 1. Carve out the cells and open walls
     for y in range(maze.height):
         for x in range(maze.width):
             cell = maze.grid[y][x]
             rx, ry = x * 2 + 1, y * 2 + 1
 
-            # The cell itself is open space
-            grid[ry][rx] = False
+            # --- THE FIX IS HERE ---
+            # If the cell is part of the 42, make its center a solid wall!
+            if hasattr(cell, 'is_pattern') and cell.is_pattern:
+                grid[ry][rx] = True
+            else:
+                # Normal cells have an open center
+                grid[ry][rx] = False
 
             # Carve walls if they are open
             if not cell.walls["N"]: grid[ry - 1][rx] = False
@@ -60,7 +63,6 @@ def display_maze(maze, path=None, player_pos=None, path_color="\033[94m") -> Non
         for i in range(len(path)):
             px, py = path[i]
             render_path.add((px * 2 + 1, py * 2 + 1))
-            # Fill the space between current and previous path step
             if i > 0:
                 prev_x, prev_y = path[i-1]
                 rx = (px + prev_x) + 1  
@@ -73,26 +75,31 @@ def display_maze(maze, path=None, player_pos=None, path_color="\033[94m") -> Non
             orig_x, orig_y = (x - 1) // 2, (y - 1) // 2
             is_cell_center = (x % 2 != 0 and y % 2 != 0)
 
-            # Draw entities, path, walls, or empty space
+            # Draw entities using the current theme
             if is_cell_center and player_pos == (orig_x, orig_y):
-                print(CAT, end="")
+                # The moving "head" of the path during animation
+                print(current_entry, end="")
+            elif is_cell_center and maze.entry == (orig_x, orig_y):
+                # Permanently show the start icon at the entrance
+                print(current_entry, end="")
             elif is_cell_center and maze.exit == (orig_x, orig_y):
-                print(GOAL, end="")
+                # Permanently show the target icon at the exit
+                print(current_target, end="")
             elif (x, y) in render_path:
-                print(f"{path_color}{PATH_CHAR}{RESET}", end="")
+                print(current_path, end="")
             elif grid[y][x]:
-                print(WALL, end="")
+                print(current_wall, end="")
             else:
                 print(OPEN, end="")
-        print() # Newline at end of row
+        print() 
     print()
 
 
-def animate_solution(maze, path, path_color, delay: float = 0.08) -> None:
+def animate_solution(maze, path, theme_index, delay: float = 0.08) -> None:
     visited = []
     for pos in path:
         visited.append(pos)
-        display_maze(maze, path=visited, player_pos=pos, path_color=path_color)
+        display_maze(maze, path=visited, player_pos=pos, theme_index=theme_index)
         time.sleep(delay)
 
 # ==============================
@@ -100,7 +107,6 @@ def animate_solution(maze, path, path_color, delay: float = 0.08) -> None:
 # ==============================
 
 def string_path_to_coords(maze, path_str: str) -> list[tuple[int, int]]:
-    """Converts the 'NNES' string back into (x,y) tuples for the visualizer."""
     if not maze.entry:
         return []
         
@@ -123,44 +129,46 @@ def run_interactive_menu(maze, config) -> None:
     path_coords = string_path_to_coords(maze, path_str)
     
     show_path = False
-    color_index = 0
+    theme_index = 0
     
     while True:
-        current_color = COLORS[color_index][0]
-        
-        # Display the maze based on current state
+        # Display the maze based on current state and theme
         active_path = path_coords if show_path else None
-        display_maze(maze, path=active_path, path_color=current_color)
+        display_maze(maze, path=active_path, theme_index=theme_index)
         
-        # Print Menu
+        # Print Menu dynamically based on the current theme
+        current_theme_name = THEME_NAMES[theme_index]
+        current_entry_icon = ENTRY_ICONS[theme_index]
+        current_target_icon = TARGET_ICONS[theme_index]
+        
         print("====== A-Maze-ing Interactive Menu ======")
         print("1. Re-generate a new maze")
         print(f"2. {'Hide' if show_path else 'Show'} path from entry to exit")
-        print(f"3. Rotate path colors (Current: {COLORS[color_index][1]})")
-        print("4. Animate solution 🐱🐟")
+        print(f"3. Rotate maze theme (Current: {current_theme_name})")
+        print(f"4. Animate solution {current_entry_icon} to {current_target_icon}")
         print("5. Quit")
         
         choice = input("\nChoice? (1-5): ").strip()
-        
         if choice == "1":
             maze.__init__(config["WIDTH"], config["HEIGHT"])
             maze.set_entry_exit(config["ENTRY"], config["EXIT"])
-            gen = MazeGenerator(maze)
-            gen.generate()
-            maze.open_entry_exit()
             
-            path_str = maze.find_shortest_path()
-            path_coords = string_path_to_coords(maze, path_str)
-            export_maze(maze, config["OUTPUT_FILE"], path_str)
+            # Update this line to pass the perfect flag:
+            gen = MazeGenerator(maze, perfect=config["PERFECT"]) 
+            gen.generate()
+            show_path = False
             
         elif choice == "2":
             show_path = not show_path
             
         elif choice == "3":
-            color_index = (color_index + 1) % len(COLORS)
+            # Rotate through the themes using modulo arithmetic
+            theme_index = (theme_index + 1) % len(THEME_NAMES)
+            show_path = False
             
         elif choice == "4":
-            animate_solution(maze, path_coords, current_color)
+            animate_solution(maze, path_coords, theme_index)
+            show_path = True
             
         elif choice == "5":
             print("\nExiting A-Maze-ing. Goodbye!")

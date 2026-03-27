@@ -3,7 +3,7 @@ from parse import parse_config
 from maze import Maze
 from generator import MazeGenerator
 from exporter import export_maze
-from display import run_interactive_menu # NEW IMPORT
+from display import run_interactive_menu
 
 def main() -> None:
     if len(sys.argv) != 2:
@@ -12,18 +12,15 @@ def main() -> None:
 
     try:
         config = parse_config(sys.argv[1])
-        
         maze = Maze(config["WIDTH"], config["HEIGHT"])
         maze.set_entry_exit(config["ENTRY"], config["EXIT"])
         
-        gen = MazeGenerator(maze)
+        # Update this line to pass the perfect flag:
+        gen = MazeGenerator(maze, perfect=config["PERFECT"])
         gen.generate()
-        
-        maze.open_entry_exit()
+
         path_str = maze.find_shortest_path()
         export_maze(maze, config["OUTPUT_FILE"], path_str)
-        
-        # Launch the interactive terminal UI
         run_interactive_menu(maze, config)
 
     except Exception as e:
