@@ -34,7 +34,10 @@ class Maze:
         ]
 
     def remove_wall(self, current: Cell, direction: str, neighbor: Cell) -> None:
-        opposite = {"N": "S", "E": "W", "S": "N", "W": "E"}
+        opposite = {"N": "S",
+                    "E": "W",
+                    "S":"N",
+                    "W": "E"}
         current.walls[direction] = False
         neighbor.walls[opposite[direction]] = False
 

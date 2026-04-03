@@ -9,13 +9,11 @@ def main() -> None:
     if len(sys.argv) != 2:
         print("Usage: python3 a_maze_ing.py config.txt")
         sys.exit(1)
-
     try:
         config = parse_config(sys.argv[1])
         maze = Maze(config["WIDTH"], config["HEIGHT"])
         maze.set_entry_exit(config["ENTRY"], config["EXIT"])
         
-        # Update this line to pass the perfect flag:
         gen = MazeGenerator(maze, perfect=config["PERFECT"])
         gen.generate()
 
